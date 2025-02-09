@@ -34,7 +34,7 @@ document.getElementById('check-btn').addEventListener('click', () => {
         document.getElementById('overallRiskScore').textContent = response.overallRiskScore || 'N/A';
         document.getElementById('threatLevel').textContent = response.summary.threatLevel || 'N/A';
         document.getElementById('geminiDetails').textContent = response.gemini_details || 'N/A';
-        document.getElementById('aiAnalysis').textContent = response.content_analysis_score + ' %' || 'N/A';
+        document.getElementById('aiAnalysis').textContent = 100 - response.overallRiskScore + ' %' || 'N/A';
         // document.getElementById('message').textContent = ' ' + response.summary.message || 'N/A';
         if(response.gemini_details){
           document.getElementById('message').textContent = ' the website appears to be safe';
@@ -42,7 +42,7 @@ document.getElementById('check-btn').addEventListener('click', () => {
           document.getElementById('message').textContent = 'the website may be malicious';
         }
 
-        if (response.content_analysis_score > 30) {
+        if (response.content_analysis_score < 70) {
           document.getElementById('tab-3').classList.add('green');
         } else {
           document.getElementById('tab-3').classList.add('red');

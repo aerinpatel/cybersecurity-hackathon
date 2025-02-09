@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SafeLink",
+  "name": "PhishGuard",
   "version": "1.0",
   "description": "Automatic phishing protection",
   "permissions": [

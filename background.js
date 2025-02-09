@@ -1,23 +1,19 @@
 const API_URL = "https://phissy.vercel.app/api/check?url=";
 
-// Function to extract the hostname from a URLconst API_URL = "https://phissy.vercel.app/api/check?url=";
-
 // Function to extract the hostname from a URL
 function extractHostname(url) {
-  try {
-    // Add https:// if not present
-    if (!/^https?:\/\//i.test(url)) {
-      url = 'https://' + url;
-    }
-    const parsedUrl = new URL(url);
-    return parsedUrl.hostname;
-  } catch (error) {
-    console.error("Invalid URL:", error.message);
-    return null;
+  let hostname;
+  // Remove protocol and get hostname
+  if (url.indexOf("//") > -1) {
+    hostname = url.split('/')[2];
+  } else {
+    hostname = url.split('/')[0];
   }
+  // Remove port number and path
+  hostname = hostname.split(':')[0];
+  hostname = hostname.split('?')[0];
+  return hostname;
 }
-
-// ... existing code ...
 
 // Function to check if a URL is malicious
 async function checkURL(url) {
@@ -34,45 +30,6 @@ async function checkURL(url) {
     console.log(`Checking URL: ${hostname}`);
     const response = await fetch(`${API_URL}${encodeURIComponent(hostname)}`);
     console.log("API is going on this: " + `${API_URL}${encodeURIComponent(hostname)}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log("API Response:", data); // Log the response data
-    return data;
-  } catch (error) {
-    console.error("Error checking URL:", error.message);
-    return { error: error.message };
-  }
-}
-
-// ... rest of the existing code ...
-// Real-time protection
-chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
-  if (details.frameId === 0) { // Only check main frame
-    const result = await checkURL(details.url);
-    if (result.is_malicious) {
-      chrome.tabs.update(details.tabId, {
-        url: chrome.runtime.getURL("warning.html") + `?url=${encodeURIComponent(details.url)}`
-      });
-    }
-  }
-});
-
-// Periodic cache cleanup
-setInterval(() => urlCache.clear(), 15 * 60 * 1000); // Clear cache every 15 minutes
-// Function to check if a URL is malicious
-async function checkURL(url) {
-  try {
-    const hostname = extractHostname(url);
-    if (!hostname) {
-      throw new Error("Invalid URL");
-    }
-
-    console.log(`Checking URL: ${hostname}`);
-    const response = await fetch(`${API_URL}${hostname}`);
-    console.log("API is going on this: " + `${API_URL}${hostname}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -114,6 +71,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep the message channel open for sendResponse
   }
 });
+
+// Real-time protection
+chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+  if (details.frameId === 0) { // Only check main frame
+    const result = await checkURL(details.url);
+    if (result.is_malicious) {
+      chrome.tabs.update(details.tabId, {
+        url: chrome.runtime.getURL("warning.html") + `?url=${encodeURIComponent(details.url)}`
+      });
+    }
+  }
+});
+
+// Periodic cache cleanup
+setInterval(() => urlCache.clear(), 15 * 60 * 1000); // Clear cache every 15 minutes
 
 // Automatically check every tab when it is updated
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
