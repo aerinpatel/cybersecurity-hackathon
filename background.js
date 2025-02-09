@@ -1,42 +1,123 @@
-const API_KEY = "AIzaSyDNc4dV2hcxkpFGmCn1jmIhfq0UaSNpjRw"; // Replace with your API key
-const API_URL = `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${API_KEY}`;
+const API_URL = "https://phissy.vercel.app/api/check?url=";
 
-// Function to check if a URL is malicious
-async function checkURL(url) {
-  const requestBody = {
-    client: {
-      clientId: "SafeLink",
-      clientVersion: "1.0",
-    },
-    threatInfo: {
-      threatTypes: ["MALWARE", "SOCIAL_ENGINEERING"],
-      platformTypes: ["ANY_PLATFORM"],
-      threatEntryTypes: ["URL"],
-      threatEntries: [{ url }],
-    },
-  };
+// Function to extract the hostname from a URLconst API_URL = "https://phissy.vercel.app/api/check?url=";
 
+// Function to extract the hostname from a URL
+function extractHostname(url) {
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    const data = await response.json();
-    return data.matches ? "Malicious" : "Safe";
+    // Add https:// if not present
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+    const parsedUrl = new URL(url);
+    return parsedUrl.hostname;
   } catch (error) {
-    console.error("Error checking URL:", error);
-    return "Error";
+    console.error("Invalid URL:", error.message);
+    return null;
   }
 }
 
-// Listen for messages from the popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "checkURL") {
-    checkURL(request.url).then((result) => sendResponse({ result }));
-    return true; // Required for async response
+// ... existing code ...
+
+// Function to check if a URL is malicious
+async function checkURL(url) {
+  try {
+    // Add https:// if not present
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+    const hostname = extractHostname(url);
+    if (!hostname) {
+      throw new Error("Invalid URL");
+    }
+
+    console.log(`Checking URL: ${hostname}`);
+    const response = await fetch(`${API_URL}${encodeURIComponent(hostname)}`);
+    console.log("API is going on this: " + `${API_URL}${encodeURIComponent(hostname)}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("API Response:", data); // Log the response data
+    return data;
+  } catch (error) {
+    console.error("Error checking URL:", error.message);
+    return { error: error.message };
+  }
+}
+
+// ... rest of the existing code ...
+// Real-time protection
+chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
+  if (details.frameId === 0) { // Only check main frame
+    const result = await checkURL(details.url);
+    if (result.is_malicious) {
+      chrome.tabs.update(details.tabId, {
+        url: chrome.runtime.getURL("warning.html") + `?url=${encodeURIComponent(details.url)}`
+      });
+    }
+  }
+});
+
+// Periodic cache cleanup
+setInterval(() => urlCache.clear(), 15 * 60 * 1000); // Clear cache every 15 minutes
+// Function to check if a URL is malicious
+async function checkURL(url) {
+  try {
+    const hostname = extractHostname(url);
+    if (!hostname) {
+      throw new Error("Invalid URL");
+    }
+
+    console.log(`Checking URL: ${hostname}`);
+    const response = await fetch(`${API_URL}${hostname}`);
+    console.log("API is going on this: " + `${API_URL}${hostname}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("API Response:", data); // Log the response data
+    return data;
+  } catch (error) {
+    console.error("Error checking URL:", error.message);
+    return { error: error.message };
+  }
+}
+
+// Listen for messages from the popup script and content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === "checkURL") {
+    checkURL(message.url).then(result => {
+      if (result.is_malicious) {
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'icons/icon.png',
+          title: 'SafeLink Alert',
+          message: 'Warning: The URL you clicked is malicious!'
+        });
+        chrome.tabs.update(sender.tab.id, {
+          url: chrome.runtime.getURL("warning.html") + `?url=${encodeURIComponent(message.url)}`
+        });
+      }
+      if (sendResponse) {
+        console.log(result);
+        sendResponse(result);
+      }
+    }).catch(error => {
+      console.error("Error in checkURL:", error.message);
+      if (sendResponse) {
+        sendResponse({ error: error.message });
+      }
+    });
+    return true; // Keep the message channel open for sendResponse
+  }
+});
+
+// Automatically check every tab when it is updated
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    chrome.runtime.sendMessage({ action: "checkURL", url: tab.url });
   }
 });

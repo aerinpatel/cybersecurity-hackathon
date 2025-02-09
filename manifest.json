@@ -2,12 +2,21 @@
   "manifest_version": 3,
   "name": "SafeLink",
   "version": "1.0",
-  "description": "Detects phishing and malicious websites using Google Safe Browsing API.",
-  "permissions": ["activeTab", "storage"],
+  "description": "Automatic phishing protection",
+  "permissions": [
+    "tabs",
+    "webNavigation",
+    "notifications",
+    "storage"
+  ],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
   },
+  "web_accessible_resources": [{
+    "resources": ["warning.html"],
+    "matches": ["<all_urls>"]
+  }],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
